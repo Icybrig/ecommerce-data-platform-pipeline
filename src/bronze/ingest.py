@@ -1,7 +1,9 @@
 from pathlib import Path
 
 from pyspark.sql import SparkSession
+from pyspark.sql.functions import current_timestamp, lit
 from delta import configure_spark_with_delta_pip
+
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
@@ -40,12 +42,19 @@ def ingest_table(spark, table_name):
         .csv(source_path)
     )
 
+    # Add ingestion metadata
+    df = (
+        df.withColumn("_ingested_at", current_timestamp())
+        .withColumn("_source", lit(f"{table_name}.csv"))
+    )
+
     print(f"{table_name}: {df.count()} rows")
 
     (
         df.write
         .format("delta")
         .mode("overwrite")
+        .option("overwriteSchema", "true")
         .save(target_path)
     )
 
