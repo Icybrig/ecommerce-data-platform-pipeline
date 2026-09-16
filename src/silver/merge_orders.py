@@ -1,5 +1,7 @@
 from pathlib import Path
 
+from datetime import datetime
+
 from delta import configure_spark_with_delta_pip
 from delta.tables import DeltaTable
 
@@ -11,13 +13,21 @@ from pyspark.sql.functions import (
     row_number,
 )
 from pyspark.sql.window import Window
+from pyspark.sql.functions import lit
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 CDC_PATH = PROJECT_ROOT / "data" / "raw" / "cdc" / "orders_cdc.csv"
 SILVER_PATH = PROJECT_ROOT / "data" / "silver" / "orders"
+WATERMARK_PATH = (
+    PROJECT_ROOT
+    / "data"
+    / "state"
+    / "orders_watermark.txt"
+)
 
+DEFAULT_WATERMARK = datetime(1900, 1, 1)
 
 def create_spark_session():
     builder = (
@@ -36,6 +46,28 @@ def create_spark_session():
 
     return configure_spark_with_delta_pip(builder).getOrCreate()
 
+#read where the last time stopped
+def read_watermark():
+    if not WATERMARK_PATH.exists():
+        return DEFAULT_WATERMARK
+
+    content = WATERMARK_PATH.read_text().strip()
+
+    if not content:
+        return DEFAULT_WATERMARK
+
+    return datetime.fromisoformat(content)
+
+#save the position of this time to continue next time
+def write_watermark(watermark):
+    WATERMARK_PATH.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    WATERMARK_PATH.write_text(
+        watermark.isoformat()
+    )
 
 def main():
     spark = create_spark_session()
@@ -53,6 +85,9 @@ def main():
             .csv(str(CDC_PATH))
         )
 
+        watermark = read_watermark()
+        print(f"current watermark: {watermark}")
+
         # ---------------------------------------------------------
         # 2. Explicit schema
         # ---------------------------------------------------------
@@ -65,6 +100,10 @@ def main():
             .withColumn("amount", col("amount").cast("double"))
             .withColumn("order_date", col("order_date").cast("date"))
             .withColumn("updated_at", col("updated_at").cast("timestamp"))
+        )
+
+        cdc_df = cdc_df.filter(
+            col("updated_at") > lit(watermark)
         )
 
         # ---------------------------------------------------------
@@ -146,6 +185,16 @@ def main():
             .whenNotMatchedInsertAll()
             .execute()
         )
+
+        max_updated_at = (
+            cdc_df
+            .agg({"updated_at": "max"})
+            .collect()[0][0]
+        )
+
+        if max_updated_at is not None:
+            write_watermark(max_updated_at)
+            print(f"New watermark: {max_updated_at}")
 
         print("MERGE completed successfully.")
 
