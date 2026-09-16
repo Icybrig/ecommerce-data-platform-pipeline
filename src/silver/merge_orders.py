@@ -1,5 +1,7 @@
 from pathlib import Path
 
+from datetime import datetime, timedelta
+
 from delta import configure_spark_with_delta_pip
 from delta.tables import DeltaTable
 
@@ -11,13 +13,22 @@ from pyspark.sql.functions import (
     row_number,
 )
 from pyspark.sql.window import Window
+from pyspark.sql.functions import lit
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 CDC_PATH = PROJECT_ROOT / "data" / "raw" / "cdc" / "orders_cdc.csv"
 SILVER_PATH = PROJECT_ROOT / "data" / "silver" / "orders"
+WATERMARK_PATH = (
+    PROJECT_ROOT
+    / "data"
+    / "state"
+    / "orders_watermark.txt"
+)
 
+DEFAULT_WATERMARK = datetime(1900, 1, 1)
+LOOKBACK_MINUTES = 5
 
 def create_spark_session():
     builder = (
@@ -36,6 +47,28 @@ def create_spark_session():
 
     return configure_spark_with_delta_pip(builder).getOrCreate()
 
+#read where the last time stopped
+def read_watermark():
+    if not WATERMARK_PATH.exists():
+        return DEFAULT_WATERMARK
+
+    content = WATERMARK_PATH.read_text().strip()
+
+    if not content:
+        return DEFAULT_WATERMARK
+
+    return datetime.fromisoformat(content)
+
+#save the position of this time to continue next time
+def write_watermark(watermark):
+    WATERMARK_PATH.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    WATERMARK_PATH.write_text(
+        watermark.isoformat()
+    )
 
 def main():
     spark = create_spark_session()
@@ -51,6 +84,24 @@ def main():
             .option("header", True)
             .option("inferSchema", True)
             .csv(str(CDC_PATH))
+        )
+
+        watermark = read_watermark()
+
+        lookback_watermark = watermark - timedelta(
+                minutes=LOOKBACK_MINUTES
+        )
+
+        print(f"Current watermark: {watermark}")
+        print(f"Lookback watermark: {lookback_watermark}")
+
+        cdc_df = cdc_df.filter(
+            col("updated_at") > lit(lookback_watermark)
+        )
+
+        print(
+            f"CDC records after lookback filter: "
+            f"{cdc_df.count()}"
         )
 
         # ---------------------------------------------------------
@@ -140,10 +191,22 @@ def main():
                 cdc_df.alias("source"),
                 "target.order_id = source.order_id",
             )
-            .whenMatchedUpdateAll()
+            .whenMatchedUpdateAll(
+                condition = "source.updated_at > target.updated_at"
+            )
             .whenNotMatchedInsertAll()
             .execute()
         )
+
+        max_updated_at = (
+            cdc_df
+            .agg({"updated_at": "max"})
+            .collect()[0][0]
+        )
+
+        if max_updated_at is not None:
+            write_watermark(max_updated_at)
+            print(f"New watermark: {max_updated_at}")
 
         print("MERGE completed successfully.")
 
@@ -164,7 +227,7 @@ def main():
             result_df
             .filter(
                 col("order_id").isin(
-                    [1, 2, 3, 1001, 1002]
+                    [1, 2, 3, 1001, 1002, 1003]
                 )
             )
             .select(

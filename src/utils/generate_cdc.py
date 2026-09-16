@@ -57,6 +57,15 @@ def generate_orders_cdc():
             "updated_at": "2026-09-16 11:00:00",
         },
         {
+            "order_id": 1001,
+            "customer_id": 40,
+            "product_id": 15,
+            "quantity": 2,
+            "amount": 180.00,
+            "order_date": "2026-09-16",
+            "updated_at": "2026-09-16 12:00:00",
+        },
+        {
             "order_id": 1002,
             "customer_id": 50,
             "product_id": 20,
@@ -64,6 +73,15 @@ def generate_orders_cdc():
             "amount": 250.00,
             "order_date": "2026-09-16",
             "updated_at": "2026-09-16 11:05:00",
+        },
+        {
+            "order_id": 1003,
+            "customer_id": 60,
+            "product_id": 25,
+            "quantity": 2,
+            "amount": 300.00,
+            "order_date": "2026-09-16",
+            "updated_at": "2026-09-16 11:58:00",
         },
     ]
 
