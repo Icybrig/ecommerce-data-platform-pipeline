@@ -140,7 +140,9 @@ def main():
                 cdc_df.alias("source"),
                 "target.order_id = source.order_id",
             )
-            .whenMatchedUpdateAll()
+            .whenMatchedUpdateAll(
+                condition = "source.updated_at > target.updated_at"
+            )
             .whenNotMatchedInsertAll()
             .execute()
         )
