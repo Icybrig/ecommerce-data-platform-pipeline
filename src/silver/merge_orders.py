@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from delta import configure_spark_with_delta_pip
 from delta.tables import DeltaTable
@@ -28,6 +28,7 @@ WATERMARK_PATH = (
 )
 
 DEFAULT_WATERMARK = datetime(1900, 1, 1)
+LOOKBACK_MINUTES = 5
 
 def create_spark_session():
     builder = (
@@ -86,7 +87,22 @@ def main():
         )
 
         watermark = read_watermark()
-        print(f"current watermark: {watermark}")
+
+        lookback_watermark = watermark - timedelta(
+                minutes=LOOKBACK_MINUTES
+        )
+
+        print(f"Current watermark: {watermark}")
+        print(f"Lookback watermark: {lookback_watermark}")
+
+        cdc_df = cdc_df.filter(
+            col("updated_at") > lit(lookback_watermark)
+        )
+
+        print(
+            f"CDC records after lookback filter: "
+            f"{cdc_df.count()}"
+        )
 
         # ---------------------------------------------------------
         # 2. Explicit schema
@@ -100,10 +116,6 @@ def main():
             .withColumn("amount", col("amount").cast("double"))
             .withColumn("order_date", col("order_date").cast("date"))
             .withColumn("updated_at", col("updated_at").cast("timestamp"))
-        )
-
-        cdc_df = cdc_df.filter(
-            col("updated_at") > lit(watermark)
         )
 
         # ---------------------------------------------------------
@@ -215,7 +227,7 @@ def main():
             result_df
             .filter(
                 col("order_id").isin(
-                    [1, 2, 3, 1001, 1002]
+                    [1, 2, 3, 1001, 1002, 1003]
                 )
             )
             .select(

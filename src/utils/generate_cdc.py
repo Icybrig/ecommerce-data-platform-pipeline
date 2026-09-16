@@ -74,6 +74,15 @@ def generate_orders_cdc():
             "order_date": "2026-09-16",
             "updated_at": "2026-09-16 11:05:00",
         },
+        {
+            "order_id": 1003,
+            "customer_id": 60,
+            "product_id": 25,
+            "quantity": 2,
+            "amount": 300.00,
+            "order_date": "2026-09-16",
+            "updated_at": "2026-09-16 11:58:00",
+        },
     ]
 
     df = pd.DataFrame(rows)
