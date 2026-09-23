@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+
+# Spark / Delta generated data
+data/bronze/
+data/silver/
+data/gold/
+data/state/
+
+# IDE
+.vscode/
+
+# OS
+.DS_Store
