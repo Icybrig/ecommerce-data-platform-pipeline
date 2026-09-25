@@ -798,24 +798,3 @@ How do we deploy it to the cloud?
 ```
 
 The final goal is to evolve the project into a production-style **AWS + Databricks data platform**.
-
----
-
-## Author
-
-**Liyang FANG**
-
-Data Engineer / Data Scientist
-
-Focus areas:
-
-* Data Engineering
-* Machine Learning
-* Deep Learning
-* PySpark
-* SQL
-* AWS
-* Databricks
-* Data Platforms
-
-GitHub: [Icybrig](https://github.com/Icybrig)
