@@ -1,0 +1,14 @@
+environment: dev
+
+paths:
+  raw: data/raw
+  bronze: data/bronze
+  silver: data/silver
+  gold: data/gold
+  state: data/state
+
+cdc:
+  lookback_minutes: 5
+
+spark:
+  app_name: EcommerceDataPlatform

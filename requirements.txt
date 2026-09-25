@@ -2,3 +2,4 @@ pyspark==4.2.0
 delta-spark
 pandas
 pytest
+PyYAML
